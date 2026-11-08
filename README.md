@@ -48,7 +48,7 @@ git clone https://github.com/AntNodes/doli-node-guide.git && cd doli-node-guide/
 cp .env.example .env && chmod 600 .env       # при необходимости поправьте NODE_DIR и KEYS_DIR
 sudo mkdir -p /srv/doli/node /srv/doli/keys
 sudo chown -R 1000:1000 /srv/doli && sudo chmod 700 /srv/doli/keys
-docker compose build doli                    # около 15 минут; коммит тега сверяется с .env
+docker compose build doli                    # 15–50 минут (зависит от числа ядер); коммит тега сверяется с .env
 docker compose up -d
 docker logs -f --tail 50 doli-node
 docker compose run --rm cli chain            # высота блока; сравните с эксплорером
