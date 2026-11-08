@@ -16,9 +16,10 @@
 3. [Сборка и запуск ноды](#3-сборка-и-запуск-ноды)
 4. [Кошелёк и ключ producer'а](#4-кошелёк-и-ключ-producerа)
 5. [Faucet и регистрация](#5-faucet-и-регистрация)
-6. [Мониторинг](#6-мониторинг)
+6. [Проверка раз в день](#6-проверка-раз-в-день)
 7. [Обновление](#7-обновление)
 8. [Правила и грабли](#8-правила-и-грабли)
+9. [Полезные команды](#9-полезные-команды)
 
 ## 1. Что такое DOLI-producer
 
@@ -28,7 +29,7 @@ DOLI — L1 на Rust с Proof of Time (VDF) и моделью UTXO. Блок в
 - **Bond заморожен на 4 года.** Выход в 1-й год сжигает 75% bond'а, во 2-й — 50%, в 3-й — 25%, после 3 лет — 0%. Деньги приходят через 7 дней после заявки ([vesting](https://github.com/doli-network/doli/blob/main/docs/becoming_a_producer.md#66-vesting-schedule-and-early-withdrawal-penalties)).
 - **Награда.** Каждая эпоха даёт до 360 DOLI (1 DOLI за блок). Они делятся пропорционально bond'ам между producer'ами, у которых attestation за эпоху не ниже 90% ([rewards.md](https://github.com/doli-network/doli/blob/main/docs/rewards.md#5-epoch-reward-pool-math)). Производить блоки для этого не нужно: достаточно, чтобы нода была онлайн и подписывала attestation.
 - **Производство блоков.** Если producer'ов больше 50, блоки производят первые 50 по старшинству регистрации ([round-robin](https://github.com/doli-network/doli/blob/main/docs/becoming_a_producer.md#41-epoch-frozen-round-robin)).
-- **Ориентир на октябрь 2026.** Около 100 активных producer'ов и 36 700 bond'ов ([эксплорер](https://explorer.doli.network/network.html)). Доход одного bond'а: 360 DOLI ÷ 36 700 bond'ов ≈ 0,0098 DOLI за эпоху; × 24 эпохи ≈ 0,24 DOLI в сутки. Бирж нет: DOLI за USDT продаёт только команда по своему курсу ([buy_doli.md](https://github.com/doli-network/doli/blob/main/docs/buy_doli.md)). Поэтому участие похоже на дешёвую лотерею. Ставьте ноду изолированно, чтобы она не мешала другим сервисам на сервере.
+- **Сколько это приносит.** Доход одного bond'а в сутки = 360 DOLI × 24 эпохи ÷ число bond'ов в сети. Число bond'ов смотрите на [эксплорере](https://explorer.doli.network/network.html) в день, когда считаете: оно растёт. Бирж нет: DOLI за USDT продаёт только команда по своему курсу ([buy_doli.md](https://github.com/doli-network/doli/blob/main/docs/buy_doli.md)). Поэтому участие похоже на дешёвую лотерею. Ставьте ноду изолированно, чтобы она не мешала другим сервисам на сервере.
 
 ## 2. Что нужно
 
@@ -103,33 +104,18 @@ docker compose run --rm cli -w /keys/producer.json new
    docker compose run --rm cli -w /keys/producer.json producer status       # active
    docker logs doli-node 2>&1 | grep -E "ATTEST_EGRESS|slash" | tail      # пусто
    ```
+9. Необязательно: имя вместо длинного ключа в списке producer'ов. Откройте [doli.network/register.html](https://doli.network/register.html), выберите сеть mainnet, введите имя (3–32 знака: `a–z`, `0–9`, `_`, `-`, `.`) и скопируйте команду подписи, которую покажет страница. Выполните её на своём сервере через контейнер: вместо `doli` подставьте `docker compose run --rm cli`, а путь кошелька — `/keys/producer.json`. Вставьте подпись обратно на страницу. Ключ странице не нужен, подпись делается у вас. Имя закрепляется сразу и навсегда ([правила страницы](https://doli.network/register.html)). Сменить его можно, но после этого 30 дней нельзя менять снова. Удаление регистрации закрывает регистрацию ключа на 30 дней. Нода к этому моменту должна быть в списке активных producer'ов.
 
-## 6. Мониторинг
+## 6. Проверка раз в день
 
-`monitoring/doli-status.py` печатает состояние ноды текстом. Подключите его к cron или к боту, который пересылает вывод в чат.
+Отдельный мониторинг не обязателен. Пока нода запущена с `restart: unless-stopped`, Docker сам поднимет её после сбоя. Но она может молча отстать от сети или оказаться не на той ветке: тогда вы не получите награду за эпоху и не узнаете об этом. Раз в день выполните две команды:
 
 ```bash
-export DOLI_ADDRESS=doli1…  DOLI_PUBKEY=…  DOLI_NODE_DIR=/srv/doli/node   # из `info`
-python3 monitoring/doli-status.py daily   # сводка, раз в день
-python3 monitoring/doli-status.py watch   # раз в 10 минут; пустой вывод = всё в порядке
+bash check-branch.sh
+docker compose run --rm cli -w /keys/producer.json producer status
 ```
 
-Что проверяет:
-- контейнер и healthcheck;
-- память: тревога, если занято больше 85% лимита (признак gossip flood);
-- RPC;
-- отставание от сети: тревога, если больше 30 блоков;
-- пиров: тревога, если меньше 3;
-- статус producer'а и пропуски attestation: тревога, если пропущено больше 6 минут за эпоху (ниже порога 90%);
-- перезапуски контейнера;
-- выход нового релиза на GitHub.
-
-`watch` пишет только когда проблема появилась, изменилась или ушла.
-
-```
-*/10 * * * *  DOLI_ADDRESS=… DOLI_PUBKEY=… python3 /path/doli-status.py watch | your-notify
-5 9 * * *     DOLI_ADDRESS=… DOLI_PUBKEY=… python3 /path/doli-status.py daily | your-notify
-```
+Ждите `OK` и статус `active`. Автоматические уведомления в чат (cron, тревоги по отставанию, памяти и пирам) описаны отдельно: [monitoring/README.md](monitoring/README.md).
 
 ## 7. Обновление
 
@@ -150,6 +136,23 @@ docker image rm local/doli:<старая версия>
 - **`node_key`** (PeerId) нода пишет **в родительскую папку** `--data-dir`. Поэтому в контейнер монтируется `/node`, а данные лежат в `/node/data`. Если смонтировать только папку данных, при старте будет ошибка `Failed to write keypair: Permission denied`.
 - **RPC** по умолчанию слушает `127.0.0.1` внутри контейнера. Чтобы работали healthcheck и CLI, нужен `--rpc-bind 0.0.0.0`. На сервере порт опубликован только на `127.0.0.1`.
 - **Лимиты.** `mem_limit: 4g` и `cpus` (`DOLI_CPUS`, по умолчанию 4) защищают остальные сервисы на сервере, если нода начнёт разрастаться (так было при gossip flood в 6.43.0).
+
+## 9. Полезные команды
+
+Все команды — из папки `node`, кошелёк `-w /keys/producer.json`. Справка по любой: добавьте `--help`.
+
+| Задача | Команда |
+|---|---|
+| Статус producer'а | `docker compose run --rm cli -w /keys/producer.json producer status` |
+| Каждый bond и когда падает штраф | `... producer bonds` и `... producer vesting-summary` |
+| Добавить bond (от 1 до 3000 всего) | `... producer add-bond --count 1` |
+| Посчитать вывод bond'ов без отправки | `... producer simulate-withdrawal --count 1` |
+| Логи ноды | `docker logs --tail 50 doli-node` |
+| Остановить ноду | `docker compose down` |
+
+Остановка ноды **не возвращает bond**: producer остаётся в списке, но не подтверждает блоки и теряет награду. Вернуть деньги можно командой `producer exit --force`, но со штрафом: до 1 года 75%, 1–2 года 50%, 2–3 года 25%, от 3 лет 0% ([Vesting](https://github.com/doli-network/doli/blob/main/docs/becoming_a_producer.md#66-vesting-schedule-and-early-withdrawal-penalties)). Сначала выполните `simulate-withdrawal`: он ничего не отправляет.
+
+Удалить ноду полностью: `docker compose down`, затем `sudo rm -rf /srv/doli/node`. Папку `/srv/doli/keys` и фразу из 24 слов не удаляйте, пока не вывели bond и не убедились, что кошелёк больше не нужен.
 
 ## Ссылки
 
