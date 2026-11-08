@@ -1,13 +1,13 @@
 # DOLI producer-нода в Docker
 
-[![DOLI](https://img.shields.io/badge/DOLI-v6.43.3-6c5ce7)](https://github.com/doli-network/doli/releases)
+[![DOLI](https://img.shields.io/badge/DOLI-v6.46.1-6c5ce7)](https://github.com/doli-network/doli/releases)
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)](node/docker-compose.yml)
 [![Язык](https://img.shields.io/badge/язык-русский-lightgrey)](#)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 Пошаговый гайд: как поставить producer'а сети [DOLI](https://doli.network) (mainnet) на свой Linux-сервер. Нода собирается из исходников и работает в Docker. Есть скрипт мониторинга, который пишет короткие сообщения в чат.
 
-Проверено на v6.43.3, октябрь 2026.
+Проверено на v6.43.3 на чистом VPS 12.10.2026: сборка, синхронизация, `new`, `info`, `balance`, `producer status`. Версия в `.env.example` обновлена до v6.46.1 (08.11.2026): сборка этой версии на чистом VPS ещё не проверена; команды кошелька `new` и `init` проверены на её официальном бинарнике, обе создают основной и BLS-ключ.
 
 ## Содержание
 
@@ -22,19 +22,19 @@
 
 ## 1. Что такое DOLI-producer
 
-DOLI — L1 на Rust с Proof of Time (VDF) и моделью UTXO. Блок выходит раз в 10 секунд, эпоха длится 360 блоков (около часа).
+DOLI — L1 на Rust с Proof of Time (VDF) и моделью UTXO. Блок выходит раз в 10 секунд, эпоха длится 360 блоков (около часа) ([параметры](https://github.com/doli-network/doli/blob/main/README.md#protocol-parameters)).
 
-- **Регистрация producer'а.** Нужен bond: 10 DOLI за один bond. Первые 10 DOLI можно получить бесплатно через faucet в Discord.
-- **Награда.** Награда эпохи, около 360 DOLI, делится пропорционально bond'ам между всеми producer'ами, у которых attestation за эпоху не ниже 90%. Производить блоки для этого не нужно: достаточно, чтобы нода была онлайн и подписывала attestation.
-- **Производство блоков.** Блоки производят только первые 50 producer'ов по старшинству регистрации.
-- **Ориентир на октябрь 2026.** Около 100 активных producer'ов и 36 700 bond'ов. Один bond приносит примерно 0,01 DOLI за эпоху, это около 0,23 DOLI в сутки. Рынка у монеты пока нет, поэтому участие похоже на дешёвую лотерею. Ставьте ноду изолированно, чтобы она не мешала другим сервисам на сервере.
-
-Актуальные цифры смотрите в [эксплорере](https://explorer.doli.network/network.html).
+- **Регистрация producer'а.** Нужен bond: 10 DOLI за один bond ([becoming_a_producer.md](https://github.com/doli-network/doli/blob/main/docs/becoming_a_producer.md#22-economic)). Первые 10 DOLI можно получить бесплатно через faucet в Discord ([faucet-bot.md](https://github.com/doli-network/doli/blob/main/docs/faucet-bot.md#what-you-get)).
+- **Bond заморожен на 4 года.** Выход в 1-й год сжигает 75% bond'а, во 2-й — 50%, в 3-й — 25%, после 3 лет — 0%. Деньги приходят через 7 дней после заявки ([vesting](https://github.com/doli-network/doli/blob/main/docs/becoming_a_producer.md#66-vesting-schedule-and-early-withdrawal-penalties)).
+- **Награда.** Каждая эпоха даёт до 360 DOLI (1 DOLI за блок). Они делятся пропорционально bond'ам между producer'ами, у которых attestation за эпоху не ниже 90% ([rewards.md](https://github.com/doli-network/doli/blob/main/docs/rewards.md#5-epoch-reward-pool-math)). Производить блоки для этого не нужно: достаточно, чтобы нода была онлайн и подписывала attestation.
+- **Производство блоков.** Если producer'ов больше 50, блоки производят первые 50 по старшинству регистрации ([round-robin](https://github.com/doli-network/doli/blob/main/docs/becoming_a_producer.md#41-epoch-frozen-round-robin)).
+- **Ориентир на октябрь 2026.** Около 100 активных producer'ов и 36 700 bond'ов ([эксплорер](https://explorer.doli.network/network.html)). Доход одного bond'а: 360 DOLI ÷ 36 700 bond'ов ≈ 0,0098 DOLI за эпоху; × 24 эпохи ≈ 0,24 DOLI в сутки. Бирж нет: DOLI за USDT продаёт только команда по своему курсу ([buy_doli.md](https://github.com/doli-network/doli/blob/main/docs/buy_doli.md)). Поэтому участие похоже на дешёвую лотерею. Ставьте ноду изолированно, чтобы она не мешала другим сервисам на сервере.
 
 ## 2. Что нужно
 
-- **Сервер.** Linux x86_64 с Docker и Compose v2. Ноде хватает 4 GB RAM и 4 CPU. После snap sync данные занимают десятки MB.
-- **Аккаунт Discord** на сервере [DOLI](https://discord.gg/aTgHyDY9QY). Faucet выдаёт монеты только тем, кто состоит на сервере **не меньше 7 дней**, поэтому вступите заранее.
+- **Сервер.** Linux x86_64 с Docker и Compose v2. Минимум для producer'а: **4 CPU, 8 GB RAM, 100 GB SSD**; рекомендуется 8 CPU, 16 GB, 500 GB NVMe ([требования](https://github.com/doli-network/doli/blob/main/docs/becoming_a_producer.md#21-hardware)). Если ядер меньше 4, контейнер с `cpus: 4` не стартует: уменьшите `DOLI_CPUS` в `.env`.
+- **Аккаунт Discord старше 1 года** на сервере [DOLI](https://discord.gg/aTgHyDY9QY). Faucet выдаёт монеты только тем, кто состоит на сервере **не меньше 7 дней** ([правила faucet](https://github.com/doli-network/doli/blob/main/docs/faucet-bot.md#eligibility-rules)), поэтому вступите заранее.
+- **CPU с флагом ADX.** Проверка: `grep -c -w adx /proc/cpuinfo`. Больше 0 — подходит. 0 — тоже подходит именно этому гайду, потому что он собирает ноду на вашем сервере (объяснение в [разделе 3](#3-сборка-и-запуск-ноды)); не подходит готовый бинарник из `install.sh`.
 - **Менеджер паролей** для seed-фразы.
 
 ## 3. Сборка и запуск ноды
@@ -44,15 +44,26 @@ git clone https://github.com/AntNodes/doli-node-guide.git && cd doli-node-guide/
 cp .env.example .env && chmod 600 .env       # при необходимости поправьте NODE_DIR и KEYS_DIR
 sudo mkdir -p /srv/doli/node /srv/doli/keys
 sudo chown -R 1000:1000 /srv/doli && sudo chmod 700 /srv/doli/keys
-docker compose build doli                    # около 10 минут; коммит тега сверяется с .env
+docker compose build doli                    # около 15 минут; коммит тега сверяется с .env
 docker compose up -d
 docker logs -f --tail 50 doli-node
 docker compose run --rm cli chain            # высота блока; сравните с эксплорером
 ```
 
-Почему сборка из исходников: официальные бинарники требуют glibc 2.38 или новее, а официальный `docker/Dockerfile` собирает только `doli-node`, без CLI.
+Почему сборка из исходников:
+- Готовые бинарники релиза падают с `SIGILL` (illegal instruction) на процессорах без ADX, например на Xeon E5 v3 ([issue #230](https://github.com/doli-network/doli/issues/230), открыт на 08.11.2026). Падает уже `doli init`. Библиотека `blst` при сборке смотрит на процессор машины, где идёт сборка ([описание blst](https://github.com/supranational/blst)). Поэтому собирайте на том же сервере, где будет работать нода. Образ, собранный на одном процессоре, на другом без ADX может упасть.
+- Готовые бинарники требуют glibc 2.39 или новее (Ubuntu 24.04).
+- Официальный `docker/Dockerfile` собирает только `doli-node`, без CLI.
 
-Snap sync занимает пару минут. Нода готова, когда её высота совпадает с эксплорером, а `docker ps` показывает `healthy`.
+Snap sync занимает 1–2 минуты. Нода готова, когда её высота совпадает с эксплорером, а `docker ps` показывает `healthy`.
+
+**Проверьте ветку.** 5 ноября 2026 сеть раскололась на две ветки; верная ветка — у seed-нод команды DOLI. Спросите у ноды хеш блока 882251:
+
+```bash
+curl -s -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","method":"getBlockByHeight","params":{"height":882251},"id":1}' http://127.0.0.1:8500 | grep -o '"hash":"[0-9a-f]\{8\}'
+```
+
+Хеш начинается с `60712566` — верная ветка. С `b4878b82` — неверная: не регистрируйтесь, следуйте шагам команды DOLI в её Discord (анонс «DOLI mainnet: check your branch and update to v6.46.1»).
 
 Порты 30300/tcp и 30301/udp нужны для входящих пиров. Открывать их необязательно: без них нода тоже работает, просто пиров будет меньше. RPC слушает только `127.0.0.1` сервера.
 
@@ -74,17 +85,22 @@ docker compose run --rm cli -w /keys/producer.json new
 
 ## 5. Faucet и регистрация
 
-1. В Discord DOLI отправьте `/faucet` с адресом из `info`. Faucet выдаёт 10,000001 DOLI: один раз на человека, на новый пустой адрес. Если вы на сервере меньше 7 дней, придёт отказ `guild_join_age`. Повторите через неделю.
-2. Проверьте баланс:
+Порядок из [faucet-bot.md](https://github.com/doli-network/doli/blob/main/docs/faucet-bot.md#how-to-claim). Нода к этому моменту должна быть синхронна, кошелёк создан.
+
+1. В Discord DOLI отправьте `/faucet`. Бот ответит личной ссылкой, её видите только вы.
+2. Откройте ссылку и нажмите кнопку. Откроется форма.
+3. Вставьте адрес из `info` и подтвердите, что адрес ваш (форма подскажет как).
+4. Ждите: каждую заявку одобряет человек. Faucet выдаёт 10,000001 DOLI (bond + комиссия регистрации), один раз на человека, на новый пустой адрес. Сообщения о выплате бот не присылает.
+5. Проверьте баланс:
    ```bash
    docker compose run --rm cli -w /keys/producer.json balance
    ```
-3. Зарегистрируйтесь с одним bond'ом:
+6. Зарегистрируйтесь с одним bond'ом. Bond замораживается на 4 года (см. [раздел 1](#1-что-такое-doli-producer)):
    ```bash
    docker compose run --rm cli -w /keys/producer.json producer register --bonds 1
    ```
-4. Включите режим producer. В `.env` укажите `PRODUCER_ARGS=--producer --producer-key /keys/producer.json`, затем выполните `docker compose up -d`.
-5. Через эпоху (около часа) проверьте:
+7. Включите режим producer. В `.env` укажите `PRODUCER_ARGS=--producer --producer-key /keys/producer.json`, затем выполните `docker compose up -d`.
+8. Через эпоху (около часа) проверьте:
    ```bash
    docker compose run --rm cli -w /keys/producer.json producer status       # active
    docker logs doli-node 2>&1 | grep -E "ATTEST_EGRESS|slash" | tail      # пусто
@@ -119,7 +135,7 @@ python3 monitoring/doli-status.py watch   # раз в 10 минут; пусто�
 
 ## 7. Обновление
 
-Автообновление выключено (`--no-auto-update`). Обновляйте вручную, когда мониторинг сообщит о новом релизе:
+Автообновление выключено (`--no-auto-update`). Обновляйте вручную, когда мониторинг сообщит о новом релизе. Перед обновлением прочитайте заметки релиза и анонс команды в Discord: бывают шаги, которые нужны одновременно с обновлением (так было при расколе 05.11.2026).
 
 ```bash
 git ls-remote https://github.com/doli-network/doli refs/tags/vX.Y.Z   # коммит тега
@@ -131,15 +147,17 @@ docker image rm local/doli:<старая версия>
 
 ## 8. Правила и грабли
 
-- **Один `producer.json` — одна работающая нода.** Если два экземпляра с одним ключом подпишут блоки в одном слоте, это двойное производство: slashing, сгорает 100% bond. При переезде сначала полностью остановите старую ноду (`docker compose down`), и только потом запускайте новую. Бэкап ключа нодой не запускайте.
-- **Выход из bond.** Vesting bond длится одни сутки: при выходе раньше штраф до 75%. Unbonding занимает 7 дней.
+- **Один `producer.json` — одна работающая нода.** Если два экземпляра с одним ключом подпишут блоки в одном слоте, это двойное производство: slashing, сгорает 100% bond ([slashing](https://github.com/doli-network/doli/blob/main/docs/becoming_a_producer.md#8-slashing)). При переезде сначала полностью остановите старую ноду (`docker compose down`), и только потом запускайте новую. Бэкап ключа нодой не запускайте.
+- **Выход из bond.** Vesting длится 4 года, штраф за ранний выход — до 75% (таблица в [разделе 1](#1-что-такое-doli-producer)). Сутки — это vesting в testnet, не в mainnet.
 - **`node_key`** (PeerId) нода пишет **в родительскую папку** `--data-dir`. Поэтому в контейнер монтируется `/node`, а данные лежат в `/node/data`. Если смонтировать только папку данных, при старте будет ошибка `Failed to write keypair: Permission denied`.
 - **RPC** по умолчанию слушает `127.0.0.1` внутри контейнера. Чтобы работали healthcheck и CLI, нужен `--rpc-bind 0.0.0.0`. На сервере порт опубликован только на `127.0.0.1`.
-- **Лимиты.** `mem_limit: 4g` и `cpus: 4` защищают остальные сервисы на сервере, если нода начнёт разрастаться (так было при gossip flood в 6.43.0).
+- **Лимиты.** `mem_limit: 4g` и `cpus` (`DOLI_CPUS`, по умолчанию 4) защищают остальные сервисы на сервере, если нода начнёт разрастаться (так было при gossip flood в 6.43.0).
 
 ## Ссылки
 
 - Сайт: https://doli.network
 - Эксплорер: https://explorer.doli.network/network.html
 - Код: https://github.com/doli-network/doli
+- Документация producer'а: https://github.com/doli-network/doli/blob/main/docs/becoming_a_producer.md
+- Faucet: https://github.com/doli-network/doli/blob/main/docs/faucet-bot.md
 - Discord: https://discord.gg/aTgHyDY9QY

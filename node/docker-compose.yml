@@ -30,7 +30,7 @@ services:
       - ${KEYS_DIR}:/keys:ro
     mem_limit: 4g
     memswap_limit: 4g
-    cpus: 4
+    cpus: ${DOLI_CPUS:-4}         # не больше числа ядер сервера, иначе контейнер не стартует
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
     logging:
