@@ -126,9 +126,7 @@ docker compose run --rm cli -w /keys/producer.json new
 
 ## 5. Faucet и регистрация
 
-Порядок из анонса faucet в Discord DOLI (в [faucet-bot.md](https://github.com/doli-network/doli/blob/main/docs/faucet-bot.md#how-to-claim) он описан короче, без подписи). Нода к этому моменту должна быть синхронна, кошелёк создан.
-
-1. В Discord DOLI в канале сервера (в личных сообщениях не работает) отправьте `/faucet`. Бот ответит личной ссылкой, она действует 10 минут.
+1. В Discord DOLI в канале сервера (в личных сообщениях не работает) отправьте например в канале #doli-airdrop сообщение `/faucet`. Бот ответит личной ссылкой, она действует 10 минут.
 2. Откройте ссылку и введите адрес из `info`. Форма попросит подписать вызов и вставить вывод `chain`. Выполните две команды, подставив текст вызова из формы:
    ```bash
    docker compose run --rm cli -w /keys/producer.json sign "ТЕКСТ_ИЗ_ФОРМЫ"
