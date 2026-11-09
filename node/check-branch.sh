@@ -16,6 +16,6 @@ if [ -z "$mine" ] || [ -z "$seed" ]; then echo "Не удалось получи
 if [ "$mine" = "$seed" ]; then
   echo "OK: блок $h одинаковый у вас и у seed ($mine). Вы на верной ветке."
 else
-  echo "РАЗНЫЕ ХЕШИ на блоке $h: у вас $mine, у seed $seed. Не регистрируйтесь, ждите шагов команды DOLI."
+  echo "РАЗНЫЕ ХЕШИ на блоке $h: у вас $mine, у seed $seed. Не регистрируйтесь, не удаляйте данные; напишите в Discord DOLI."
   exit 1
 fi
