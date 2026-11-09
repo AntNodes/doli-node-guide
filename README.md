@@ -52,6 +52,23 @@ DOLI — L1 на Rust с Proof of Time (VDF) и моделью UTXO. Блок в
 ## 2. Что нужно
 
 - **Сервер.** Linux x86_64 с Docker и Compose v2. Минимум для producer'а: **4 CPU, 8 GB RAM, 100 GB SSD**; рекомендуется 8 CPU, 16 GB, 500 GB NVMe ([требования](https://github.com/doli-network/doli/blob/main/docs/becoming_a_producer.md#21-hardware)). Если ядер меньше 4, контейнер с `cpus: 4` не стартует: уменьшите `DOLI_CPUS` в `.env`.
+
+**Если Docker не установлен** (Ubuntu 22.04/24.04, официальная установка из репозитория Docker):
+
+```bash
+sudo apt update
+sudo apt install -y ca-certificates curl
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}") stable" | sudo tee /etc/apt/sources.list.d/docker.list >/dev/null
+sudo apt update
+sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+sudo usermod -aG docker $USER
+```
+
+Выйдите из SSH и зайдите снова, иначе `docker` будет требовать `sudo`. Проверка: `docker compose version`. На Debian те же команды, но `ubuntu` в ссылке на gpg и в строке репозитория замените на `debian`.
+
 - **Аккаунт Discord старше 1 года** (365 дней) на сервере [DOLI](https://discord.gg/aTgHyDY9QY). Ждать 7 дней после вступления для faucet больше не нужно: это сказано в анонсе faucet в Discord DOLI. В документации ([faucet-bot.md](https://github.com/doli-network/doli/blob/main/docs/faucet-bot.md#eligibility-rules)) ещё старое правило, верьте анонсу.
 
 **Проверьте процессор.** Готовые программы DOLI требуют у процессора возможность под названием ADX. Проверка:
